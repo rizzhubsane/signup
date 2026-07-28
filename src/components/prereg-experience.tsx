@@ -2,18 +2,13 @@
 
 import Image from "next/image";
 import Script from "next/script";
-import {
-  type FormEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import { CONSENT_VERSION } from "@/lib/config";
-import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import type { CounterPayload } from "@/lib/schemas";
+import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
+import AnimatedGradientBackground from "@/components/ui/animated-gradient-background";
+import { GlowCard } from "@/components/ui/spotlight-card";
 
 type Step = "identity" | "type" | "startup" | "campus" | "success";
 type RegistrationKind = "individual" | "startup";
@@ -79,6 +74,16 @@ const initialCampusAmbassador: CampusAmbassadorForm = {
   motivation: "",
 };
 
+const backgroundGradientColors = [
+  "#0a0b0e",
+  "#0f1422",
+  "#182756",
+  "#4d76f2",
+  "#0a0b0e",
+];
+
+const backgroundGradientStops = [34, 56, 70, 78, 100];
+
 export function PreregExperience({ editionSlug }: { editionSlug: string }) {
   const [counter, setCounter] = useState<CounterPayload | null>(null);
   const [counterError, setCounterError] = useState<string | null>(null);
@@ -98,17 +103,15 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
   );
   const [turnstileToken, setTurnstileToken] = useState<string | undefined>();
 
-  const counterUrl = useMemo(
-    () => `/api/v1/counters/${encodeURIComponent(editionSlug)}`,
-    [editionSlug],
-  );
-
   const refreshCounters = useCallback(async () => {
     try {
-      const response = await fetch(counterUrl, {
-        headers: { accept: "application/json" },
-        cache: "no-store",
-      });
+      const response = await fetch(
+        `/api/v1/counters/${encodeURIComponent(editionSlug)}`,
+        {
+          headers: { accept: "application/json" },
+          cache: "no-store",
+        },
+      );
 
       if (!response.ok) {
         throw new Error("Counters are temporarily unavailable.");
@@ -120,15 +123,17 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
     } catch {
       setCounterError("Live counters will reconnect shortly.");
     }
-  }, [counterUrl]);
+  }, [editionSlug]);
 
   useEffect(() => {
     const initialLoad = window.setTimeout(() => {
       void refreshCounters();
     }, 0);
+
+    // Realtime is the main path; this slow poll is only a resilience fallback.
     const interval = window.setInterval(() => {
       void refreshCounters();
-    }, 15000);
+    }, 60000);
 
     return () => {
       window.clearTimeout(initialLoad);
@@ -325,7 +330,15 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
 
   return (
     <main className="page-shell">
-      <div className="hero-aura" aria-hidden="true" />
+      <AnimatedGradientBackground
+        Breathing
+        animationSpeed={0.012}
+        breathingRange={4}
+        gradientColors={backgroundGradientColors}
+        gradientStops={backgroundGradientStops}
+        startingGap={118}
+        topOffset={12}
+      />
 
       <section className="hero-card" aria-labelledby="hero-title">
         <div className="brand-lockup">
@@ -343,12 +356,16 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
           />
         </div>
 
+        <p className="hero-copy">
+          eDC IIT Delhi&apos;s flagship entrepreneurship summit. Pre-register
+          to lock in your spot and get updates first.
+        </p>
+
         <div className="hero-actions">
           <button
-            className="cta-button"
+            className="btn-primary btn-lg"
             type="button"
             onClick={openModal}
-            onPointerDown={openModal}
           >
             Pre-register
           </button>
@@ -362,7 +379,6 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
             </p>
           ) : null}
         </div>
-
       </section>
 
       {isOpen ? (
@@ -430,12 +446,17 @@ function CounterGrid({ counter }: { counter: CounterPayload | null }) {
   return (
     <div className="counter-grid" aria-label="BECon live counters">
       {values.map((item) => (
-        <div className="counter-card" key={item.label}>
+        <GlowCard
+          className="counter-card"
+          customSize
+          glowColor="blue"
+          key={item.label}
+        >
           <span className="counter-value">
             {typeof item.value === "number" ? formatCount(item.value) : "--"}
           </span>
           <span className="counter-label">{item.label}</span>
-        </div>
+        </GlowCard>
       ))}
     </div>
   );
@@ -507,7 +528,6 @@ function RegistrationModal({
             disabled={isSubmitting}
             type="button"
             onClick={onClose}
-            onPointerDown={onClose}
           >
             x
           </button>
@@ -555,7 +575,7 @@ function RegistrationModal({
             {error ? <div className="error-box">{error}</div> : null}
             <div className="actions">
               <button
-                className="cta-button"
+                className="btn-primary"
                 disabled={isSubmitting}
                 type="submit"
               >
@@ -566,11 +586,10 @@ function RegistrationModal({
                   : "Continue"}
               </button>
               <button
-                className="ghost-button"
+                className="btn-secondary"
                 disabled={isSubmitting}
                 type="button"
                 onClick={onBack}
-                onPointerDown={onBack}
               >
                 Back
               </button>
@@ -583,22 +602,20 @@ function RegistrationModal({
             {error ? <div className="error-box">{error}</div> : null}
             <div className="choice-grid">
               <button
-                className="choice-button"
+                className="choice-card"
                 disabled={isSubmitting}
                 type="button"
                 onClick={onIndividualChoice}
-                onPointerDown={onIndividualChoice}
               >
-                <strong>Individual</strong>
+                Individual
               </button>
               <button
-                className="choice-button"
+                className="choice-card"
                 disabled={isSubmitting}
                 type="button"
                 onClick={onStartupChoice}
-                onPointerDown={onStartupChoice}
               >
-                <strong>Startup</strong>
+                Startup
               </button>
             </div>
           </div>
@@ -640,15 +657,14 @@ function RegistrationModal({
             <TurnstileField onToken={onTurnstileToken} />
             {error ? <div className="error-box">{error}</div> : null}
             <div className="actions">
-              <button className="cta-button" disabled={isSubmitting} type="submit">
+              <button className="btn-primary" disabled={isSubmitting} type="submit">
                 {isSubmitting ? "Registering..." : "Done"}
               </button>
               <button
-                className="ghost-button"
+                className="btn-secondary"
                 disabled={isSubmitting}
                 type="button"
                 onClick={onBack}
-                onPointerDown={onBack}
               >
                 Back
               </button>
@@ -713,18 +729,17 @@ function RegistrationModal({
             {error ? <div className="error-box">{error}</div> : null}
             <div className="actions">
               <button
-                className="secondary-button"
+                className="btn-primary"
                 disabled={isSubmitting}
                 type="submit"
               >
                 {isSubmitting ? "Applying..." : "Apply now"}
               </button>
               <button
-                className="ghost-button"
+                className="btn-secondary"
                 disabled={isSubmitting}
                 type="button"
                 onClick={onSkipCampusAmbassador}
-                onPointerDown={onSkipCampusAmbassador}
               >
                 Skip for now
               </button>
@@ -741,10 +756,9 @@ function RegistrationModal({
             </p>
             <div className="actions">
               <button
-                className="cta-button"
+                className="btn-primary"
                 type="button"
                 onClick={onClose}
-                onPointerDown={onClose}
               >
                 Done
               </button>
@@ -909,3 +923,4 @@ function modalSubtitle(step: Step, registrationKind: RegistrationKind) {
 function formatCount(value: number) {
   return new Intl.NumberFormat("en-IN").format(value);
 }
+

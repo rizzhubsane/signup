@@ -15,31 +15,29 @@ export async function GET(
   try {
     const supabase = createSupabaseServiceClient();
 
-    const { data: edition, error: editionError } = await supabase
-      .from("editions")
-      .select("id, slug")
-      .eq("slug", editionSlug)
-      .eq("is_active", true)
-      .single();
-
-    if (editionError || !edition) {
-      return jsonError(404, "edition_not_found", "Active edition not found.");
-    }
-
     const { data: counter, error: counterError } = await supabase
       .from("edition_counters")
       .select(
-        "people_count, startup_count, sponsor_count, campus_ambassador_count, updated_at",
+        "edition_id, people_count, startup_count, sponsor_count, campus_ambassador_count, updated_at, editions!inner(id, slug)",
       )
-      .eq("edition_id", edition.id)
+      .eq("editions.slug", editionSlug)
+      .eq("editions.is_active", true)
       .single();
 
     if (counterError || !counter) {
-      return jsonError(404, "counter_not_found", "Counter row not found.");
+      return jsonError(404, "counter_not_found", "Active counter row not found.");
+    }
+
+    const edition = Array.isArray(counter.editions)
+      ? counter.editions[0]
+      : counter.editions;
+
+    if (!edition?.slug) {
+      return jsonError(404, "edition_not_found", "Active edition not found.");
     }
 
     const payload: CounterPayload = {
-      editionId: edition.id,
+      editionId: counter.edition_id,
       edition: edition.slug,
       people: counter.people_count,
       startups: counter.startup_count,
@@ -53,11 +51,11 @@ export async function GET(
         "cache-control": "public, s-maxage=3, stale-while-revalidate=30",
       },
     });
-  } catch (error) {
+  } catch {
     return jsonError(
       500,
       "counter_error",
-      error instanceof Error ? error.message : "Could not load counters.",
+      "Could not load counters.",
     );
   }
 }

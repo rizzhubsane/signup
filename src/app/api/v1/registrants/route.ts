@@ -27,6 +27,16 @@ export async function POST(request: NextRequest) {
       return validationError(parsed.error);
     }
 
+    const turnstile = await verifyTurnstile(parsed.data.turnstileToken);
+
+    if (!turnstile.ok) {
+      return jsonError(
+        400,
+        "bot_check_failed",
+        "Please complete the verification challenge.",
+      );
+    }
+
     const supabase = createSupabaseServiceClient();
     const ipHash = hashIp(getClientIp(request));
     const allowed = await isWithinRateLimit({
@@ -42,16 +52,6 @@ export async function POST(request: NextRequest) {
         429,
         "rate_limited",
         "Too many attempts. Please wait a minute and try again.",
-      );
-    }
-
-    const turnstile = await verifyTurnstile(parsed.data.turnstileToken);
-
-    if (!turnstile.ok) {
-      return jsonError(
-        400,
-        "bot_check_failed",
-        "Please complete the verification challenge.",
       );
     }
 
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
       return jsonError(
         400,
         "registration_failed",
-        error.message || "Registration failed.",
+        "Registration failed. Please check your details and try again.",
       );
     }
 
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
     return jsonError(
       500,
       "registration_error",
-      error instanceof Error ? error.message : "Registration failed.",
+      "Registration failed. Please try again.",
     );
   }
 }

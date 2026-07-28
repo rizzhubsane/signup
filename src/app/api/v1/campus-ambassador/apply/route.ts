@@ -26,6 +26,16 @@ export async function POST(request: NextRequest) {
       return validationError(parsed.error);
     }
 
+    const turnstile = await verifyTurnstile(parsed.data.turnstileToken);
+
+    if (!turnstile.ok) {
+      return jsonError(
+        400,
+        "bot_check_failed",
+        "Please complete the verification challenge.",
+      );
+    }
+
     const supabase = createSupabaseServiceClient();
     const ipHash = hashIp(getClientIp(request));
     const allowed = await isWithinRateLimit({
@@ -41,16 +51,6 @@ export async function POST(request: NextRequest) {
         429,
         "rate_limited",
         "Too many attempts. Please wait a minute and try again.",
-      );
-    }
-
-    const turnstile = await verifyTurnstile(parsed.data.turnstileToken);
-
-    if (!turnstile.ok) {
-      return jsonError(
-        400,
-        "bot_check_failed",
-        "Please complete the verification challenge.",
       );
     }
 
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       return jsonError(
         400,
         "application_failed",
-        error.message || "Application failed.",
+        "Application failed. Please check your details and try again.",
       );
     }
 
@@ -96,11 +96,11 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 },
     );
-  } catch (error) {
+  } catch {
     return jsonError(
       500,
       "application_error",
-      error instanceof Error ? error.message : "Application failed.",
+      "Application failed. Please try again.",
     );
   }
 }
