@@ -71,14 +71,29 @@ All writes are validated with Zod, rate-limited by hashed IP, and executed serve
 
 - Apply migrations to the production Supabase project.
 - Confirm `becon-26` is the active edition.
-- Set all production environment variables.
-- Configure Cloudflare Turnstile before public launch.
+- Set all production environment variables on Vercel.
+- **Required before public launch — Cloudflare Turnstile:**
+  1. Create a widget at [Cloudflare Turnstile](https://dash.cloudflare.com/?to=/:account/turnstile)
+  2. Add hostnames: your Vercel domain and `localhost`
+  3. Set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`
+  4. Production registration **fails closed** if these are missing
+- Set a unique random `IP_HASH_SECRET` (do not reuse the service role key).
+- Set `NEXT_PUBLIC_SITE_URL` to the exact production origin (used for origin checks).
 - Verify Supabase Realtime is enabled for `edition_counters`.
 - Run `npm run typecheck`, `npm run lint`, and `npm run build`.
-- Test duplicate registration behavior with concurrent submissions.
-- Test individual, startup, and campus ambassador flows.
+- Smoke-test individual, startup, campus ambassador, and duplicate-email flows on the deployed URL.
 - Confirm sponsor counter copy is acceptable if no sponsor intake is public yet.
 - Review privacy/consent copy with the organizing team.
+
+## Security Controls
+
+- Cloudflare Turnstile on write routes (required in production)
+- Hidden honeypot field on forms
+- Same-origin check on POST routes in production
+- IP + email/registrant rate limits
+- Request body size caps
+- Security headers (HSTS, CSP, frame deny, nosniff)
+- Service-role Supabase key stays server-only
 
 ## Scaling Notes
 

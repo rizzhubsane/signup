@@ -8,8 +8,12 @@ import {
 } from "@/lib/api-response";
 import { campusAmbassadorSchema } from "@/lib/schemas";
 import {
+  assertRequestBodySize,
+  assertTrustedOrigin,
   getClientIp,
   hashIp,
+  hashRateLimitKey,
+  isHoneypotTripped,
   isWithinRateLimit,
   verifyTurnstile,
 } from "@/lib/security";
@@ -17,8 +21,18 @@ import { createSupabaseServiceClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 
+const MAX_BODY_BYTES = 12_288;
+
 export async function POST(request: NextRequest) {
   try {
+    if (!assertRequestBodySize(request, MAX_BODY_BYTES)) {
+      return jsonError(413, "payload_too_large", "Request is too large.");
+    }
+
+    if (!assertTrustedOrigin(request)) {
+      return jsonError(403, "forbidden_origin", "Request origin is not allowed.");
+    }
+
     const body = await request.json();
     const parsed = campusAmbassadorSchema.safeParse(body);
 
@@ -26,9 +40,31 @@ export async function POST(request: NextRequest) {
       return validationError(parsed.error);
     }
 
-    const turnstile = await verifyTurnstile(parsed.data.turnstileToken);
+    if (isHoneypotTripped(parsed.data.website)) {
+      return jsonOk(
+        {
+          applicationId: "00000000-0000-4000-8000-000000000000",
+          status: "applied",
+        },
+        { status: 201 },
+      );
+    }
+
+    const clientIp = getClientIp(request);
+    const turnstile = await verifyTurnstile(
+      parsed.data.turnstileToken,
+      clientIp,
+    );
 
     if (!turnstile.ok) {
+      if (turnstile.reason === "misconfigured") {
+        return jsonError(
+          503,
+          "bot_protection_unavailable",
+          "Applications are temporarily unavailable. Please try again later.",
+        );
+      }
+
       return jsonError(
         400,
         "bot_check_failed",
@@ -37,20 +73,37 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createSupabaseServiceClient();
-    const ipHash = hashIp(getClientIp(request));
-    const allowed = await isWithinRateLimit({
+    const ipHash = hashIp(clientIp);
+
+    const ipAllowed = await isWithinRateLimit({
       supabase,
       route: "POST /api/v1/campus-ambassador/apply",
       ipHash,
-      limit: 5,
+      limit: 3,
       windowSeconds: 60,
     });
 
-    if (!allowed) {
+    if (!ipAllowed) {
       return jsonError(
         429,
         "rate_limited",
         "Too many attempts. Please wait a minute and try again.",
+      );
+    }
+
+    const registrantAllowed = await isWithinRateLimit({
+      supabase,
+      route: "POST /api/v1/campus-ambassador/apply/registrant",
+      ipHash: hashRateLimitKey(parsed.data.registrantId),
+      limit: 3,
+      windowSeconds: 3600,
+    });
+
+    if (!registrantAllowed) {
+      return jsonError(
+        429,
+        "rate_limited",
+        "Too many attempts. Please try again later.",
       );
     }
 

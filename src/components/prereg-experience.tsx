@@ -6,9 +6,10 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from "react"
 
 import { CONSENT_VERSION } from "@/lib/config";
 import type { CounterPayload } from "@/lib/schemas";
-import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
-import AnimatedGradientBackground from "@/components/ui/animated-gradient-background";
 import { GlowCard } from "@/components/ui/spotlight-card";
+import { SiteBackground } from "@/components/ui/site-background";
+import { LearnMoreLinks } from "@/components/learn-more-links";
+import { SocialLinks } from "@/components/social-links";
 
 type Step = "identity" | "type" | "startup" | "campus" | "success";
 type RegistrationKind = "individual" | "startup";
@@ -74,16 +75,6 @@ const initialCampusAmbassador: CampusAmbassadorForm = {
   motivation: "",
 };
 
-const backgroundGradientColors = [
-  "#0a0b0e",
-  "#0f1422",
-  "#182756",
-  "#4d76f2",
-  "#0a0b0e",
-];
-
-const backgroundGradientStops = [34, 56, 70, 78, 100];
-
 export function PreregExperience({ editionSlug }: { editionSlug: string }) {
   const [counter, setCounter] = useState<CounterPayload | null>(null);
   const [counterError, setCounterError] = useState<string | null>(null);
@@ -102,6 +93,12 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
     "You're pre-registered for BECon.",
   );
   const [turnstileToken, setTurnstileToken] = useState<string | undefined>();
+  // Honeypot — must stay empty. Autofill bots that stamp every input get discarded.
+  const [honeypot, setHoneypot] = useState("");
+
+  const turnstileConfigured = Boolean(
+    process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim(),
+  );
 
   const refreshCounters = useCallback(async () => {
     try {
@@ -146,49 +143,67 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
       return;
     }
 
-    const supabase = createSupabaseBrowserClient();
+    let isSubscribed = true;
+    let unsubscribe: (() => void) | undefined;
 
-    if (!supabase) {
-      return;
-    }
+    void import("@/lib/supabase-browser")
+      .then(({ createSupabaseBrowserClient }) => {
+        if (!isSubscribed) {
+          return;
+        }
 
-    const channel = supabase
-      .channel(`edition-counter:${counter.editionId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "edition_counters",
-          filter: `edition_id=eq.${counter.editionId}`,
-        },
-        (payload) => {
-          const next = payload.new as {
-            people_count: number;
-            startup_count: number;
-            sponsor_count: number;
-            campus_ambassador_count: number;
-            updated_at: string;
-          };
+        const supabase = createSupabaseBrowserClient();
 
-          setCounter((current) =>
-            current
-              ? {
-                  ...current,
-                  people: next.people_count,
-                  startups: next.startup_count,
-                  sponsors: next.sponsor_count,
-                  campusAmbassadors: next.campus_ambassador_count,
-                  updatedAt: next.updated_at,
-                }
-              : current,
-          );
-        },
-      )
-      .subscribe();
+        if (!supabase) {
+          return;
+        }
+
+        const channel = supabase
+          .channel(`edition-counter:${counter.editionId}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: "edition_counters",
+              filter: `edition_id=eq.${counter.editionId}`,
+            },
+            (payload) => {
+              const next = payload.new as {
+                people_count: number;
+                startup_count: number;
+                sponsor_count: number;
+                campus_ambassador_count: number;
+                updated_at: string;
+              };
+
+              setCounter((current) =>
+                current
+                  ? {
+                      ...current,
+                      people: next.people_count,
+                      startups: next.startup_count,
+                      sponsors: next.sponsor_count,
+                      campusAmbassadors: next.campus_ambassador_count,
+                      updatedAt: next.updated_at,
+                    }
+                  : current,
+              );
+            },
+          )
+          .subscribe();
+
+        unsubscribe = () => {
+          void supabase.removeChannel(channel);
+        };
+      })
+      .catch(() => {
+        // Polling remains active as the fallback if the realtime chunk fails.
+      });
 
     return () => {
-      void supabase.removeChannel(channel);
+      isSubscribed = false;
+      unsubscribe?.();
     };
   }, [counter?.editionId]);
 
@@ -226,6 +241,11 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
     type: "individual" | "startup",
     startupPayload?: StartupForm,
   ) {
+    if (turnstileConfigured && !turnstileToken) {
+      setError("Please complete the verification challenge.");
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
@@ -250,6 +270,7 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
               : undefined,
           consentVersion: CONSENT_VERSION,
           turnstileToken,
+          website: honeypot,
           ...trackingParams(),
         }),
       });
@@ -289,6 +310,11 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
       return;
     }
 
+    if (turnstileConfigured && !turnstileToken) {
+      setError("Please complete the verification challenge.");
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
@@ -300,6 +326,7 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
           registrantId,
           ...campusAmbassador,
           turnstileToken,
+          website: honeypot,
         }),
       });
 
@@ -330,15 +357,25 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
 
   return (
     <main className="page-shell">
-      <AnimatedGradientBackground
-        Breathing
-        animationSpeed={0.012}
-        breathingRange={4}
-        gradientColors={backgroundGradientColors}
-        gradientStops={backgroundGradientStops}
-        startingGap={118}
-        topOffset={12}
-      />
+      {/* Nothing behind the modal is visible, so stop drawing while it is up. */}
+      <SiteBackground paused={isOpen} />
+
+      <header className="site-header">
+        <Image
+          alt="Entrepreneurship Development Cell, IIT Delhi"
+          className="site-header__logo site-header__logo--edc"
+          height={200}
+          src="/edc-logo.png"
+          width={200}
+        />
+        <Image
+          alt="Indian Institute of Technology Delhi"
+          className="site-header__logo site-header__logo--iitd"
+          height={458}
+          src="/iitd-logo.png"
+          width={436}
+        />
+      </header>
 
       <section className="hero-card" aria-labelledby="hero-title">
         <div className="brand-lockup">
@@ -352,7 +389,6 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
             width={1009}
             height={686}
             priority
-            unoptimized
           />
         </div>
 
@@ -380,6 +416,11 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
           ) : null}
         </div>
       </section>
+
+      <footer className="site-footer">
+        <LearnMoreLinks />
+        <SocialLinks />
+      </footer>
 
       {isOpen ? (
         <RegistrationModal
@@ -431,6 +472,9 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
             goToStep("type");
           }}
           onTurnstileToken={setTurnstileToken}
+          honeypot={honeypot}
+          onHoneypotChange={setHoneypot}
+          botProtectionMissing={false}
         />
       ) : null}
     </main>
@@ -446,12 +490,7 @@ function CounterGrid({ counter }: { counter: CounterPayload | null }) {
   return (
     <div className="counter-grid" aria-label="BECon live counters">
       {values.map((item) => (
-        <GlowCard
-          className="counter-card"
-          customSize
-          glowColor="blue"
-          key={item.label}
-        >
+        <GlowCard className="counter-card" key={item.label}>
           <span className="counter-value">
             {typeof item.value === "number" ? formatCount(item.value) : "--"}
           </span>
@@ -483,6 +522,9 @@ function RegistrationModal({
   onSkipCampusAmbassador,
   onBack,
   onTurnstileToken,
+  honeypot,
+  onHoneypotChange,
+  botProtectionMissing,
 }: {
   step: Step;
   registrationKind: RegistrationKind;
@@ -504,6 +546,9 @@ function RegistrationModal({
   onSkipCampusAmbassador: () => void;
   onBack: () => void;
   onTurnstileToken: (token: string | undefined) => void;
+  honeypot: string;
+  onHoneypotChange: (value: string) => void;
+  botProtectionMissing: boolean;
 }) {
   return (
     <div className="modal-backdrop" role="presentation">
@@ -569,14 +614,20 @@ function RegistrationModal({
               value={identity.phone}
               onChange={(phone) => onIdentityChange({ ...identity, phone })}
             />
+            <HoneypotField value={honeypot} onChange={onHoneypotChange} />
             {registrationKind === "individual" ? (
               <TurnstileField onToken={onTurnstileToken} />
+            ) : null}
+            {botProtectionMissing ? (
+              <div className="error-box">
+                Registration is temporarily unavailable. Please try again later.
+              </div>
             ) : null}
             {error ? <div className="error-box">{error}</div> : null}
             <div className="actions">
               <button
                 className="btn-primary"
-                disabled={isSubmitting}
+                disabled={isSubmitting || botProtectionMissing}
                 type="submit"
               >
                 {registrationKind === "individual"
@@ -654,10 +705,20 @@ function RegistrationModal({
               value={startup.about}
               onChange={(about) => onStartupChange({ ...startup, about })}
             />
+            <HoneypotField value={honeypot} onChange={onHoneypotChange} />
             <TurnstileField onToken={onTurnstileToken} />
+            {botProtectionMissing ? (
+              <div className="error-box">
+                Registration is temporarily unavailable. Please try again later.
+              </div>
+            ) : null}
             {error ? <div className="error-box">{error}</div> : null}
             <div className="actions">
-              <button className="btn-primary" disabled={isSubmitting} type="submit">
+              <button
+                className="btn-primary"
+                disabled={isSubmitting || botProtectionMissing}
+                type="submit"
+              >
                 {isSubmitting ? "Registering..." : "Done"}
               </button>
               <button
@@ -725,12 +786,18 @@ function RegistrationModal({
                 })
               }
             />
+            <HoneypotField value={honeypot} onChange={onHoneypotChange} />
             <TurnstileField onToken={onTurnstileToken} />
+            {botProtectionMissing ? (
+              <div className="error-box">
+                Applications are temporarily unavailable. Please try again later.
+              </div>
+            ) : null}
             {error ? <div className="error-box">{error}</div> : null}
             <div className="actions">
               <button
                 className="btn-primary"
-                disabled={isSubmitting}
+                disabled={isSubmitting || botProtectionMissing}
                 type="submit"
               >
                 {isSubmitting ? "Applying..." : "Apply now"}
@@ -820,6 +887,29 @@ function TextareaField({
       <textarea
         id={name}
         name={name}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
+  );
+}
+
+function HoneypotField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div aria-hidden="true" className="hp-field">
+      <label htmlFor="company_website">Website</label>
+      <input
+        autoComplete="off"
+        id="company_website"
+        name="website"
+        tabIndex={-1}
+        type="text"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
