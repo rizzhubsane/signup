@@ -4,7 +4,7 @@ import Image from "next/image";
 import Script from "next/script";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
-import { CONSENT_VERSION } from "@/lib/config";
+import { CONSENT_VERSION, COUNTER_BASE } from "@/lib/config";
 import type { CounterPayload } from "@/lib/schemas";
 import RotatingText from "@/components/ui/rotating-text";
 import SpecularButton from "@/components/ui/specular-button";
@@ -500,10 +500,10 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
 function CounterGrid({ counter }: { counter: CounterPayload | null }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const labels = ["Attendees", "Startups"] as const;
-  const texts = [
-    typeof counter?.people === "number" ? formatCount(counter.people) : "--",
-    typeof counter?.startups === "number" ? formatCount(counter.startups) : "--",
-  ];
+  // Base floor always shows; real edition_counters rows stack on top.
+  const people = COUNTER_BASE.people + (counter?.people ?? 0);
+  const startups = COUNTER_BASE.startups + (counter?.startups ?? 0);
+  const texts = [formatCount(people), formatCount(startups)];
 
   return (
     <div className="counter-grid" aria-label="BECon live counters">
