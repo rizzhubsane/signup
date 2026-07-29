@@ -6,7 +6,8 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from "react"
 
 import { CONSENT_VERSION } from "@/lib/config";
 import type { CounterPayload } from "@/lib/schemas";
-import { GlowCard } from "@/components/ui/spotlight-card";
+import RotatingText from "@/components/ui/rotating-text";
+import SpecularButton from "@/components/ui/specular-button";
 import { SiteBackground } from "@/components/ui/site-background";
 import { LearnMoreLinks } from "@/components/learn-more-links";
 import { SocialLinks } from "@/components/social-links";
@@ -357,8 +358,7 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
 
   return (
     <main className="page-shell">
-      {/* Nothing behind the modal is visible, so stop drawing while it is up. */}
-      <SiteBackground paused={isOpen} />
+      <SiteBackground />
 
       <header className="site-header">
         <Image
@@ -398,13 +398,29 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
         </p>
 
         <div className="hero-actions">
-          <button
-            className="btn-primary btn-lg"
+          <SpecularButton
+            size="lg"
+            radius={18}
+            tint="#ffffff"
+            tintOpacity={0}
+            blur={0}
+            textColor="#f5f5f5"
+            lineColor="#ffffff"
+            baseColor="#525252"
+            intensity={1}
+            shineSize={10}
+            shineFade={40}
+            thickness={1}
+            speed={0.35}
+            followMouse
+            proximity={250}
+            autoAnimate={false}
+            paused={isOpen}
             type="button"
             onClick={openModal}
           >
             Pre-register
-          </button>
+          </SpecularButton>
         </div>
 
         <div className="counter-panel">
@@ -482,21 +498,34 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
 }
 
 function CounterGrid({ counter }: { counter: CounterPayload | null }) {
-  const values = [
-    { label: "Attendees", value: counter?.people },
-    { label: "Startups", value: counter?.startups },
+  const [activeIndex, setActiveIndex] = useState(0);
+  const labels = ["Attendees", "Startups"] as const;
+  const texts = [
+    typeof counter?.people === "number" ? formatCount(counter.people) : "--",
+    typeof counter?.startups === "number" ? formatCount(counter.startups) : "--",
   ];
 
   return (
     <div className="counter-grid" aria-label="BECon live counters">
-      {values.map((item) => (
-        <GlowCard className="counter-card" key={item.label}>
-          <span className="counter-value">
-            {typeof item.value === "number" ? formatCount(item.value) : "--"}
-          </span>
-          <span className="counter-label">{item.label}</span>
-        </GlowCard>
-      ))}
+      <div className="counter-card">
+        <RotatingText
+          texts={texts}
+          mainClassName="counter-rotate"
+          staggerFrom="last"
+          initial={{ y: "100%" }}
+          animate={{ y: 0 }}
+          exit={{ y: "-120%" }}
+          staggerDuration={0.025}
+          splitLevelClassName="counter-rotate__split"
+          transition={{ type: "spring", damping: 30, stiffness: 400 }}
+          rotationInterval={2000}
+          splitBy="characters"
+          auto
+          loop
+          onNext={setActiveIndex}
+        />
+        <span className="counter-label">{labels[activeIndex]}</span>
+      </div>
     </div>
   );
 }
