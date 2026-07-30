@@ -745,10 +745,6 @@ a {
   background: var(--accent-soft);
 }
 
-.turnstile-slot {
-  min-height: 65px;
-}
-
 /* Visually and accessibly hidden; bots that autofill every input still trip it. */
 .hp-field {
   position: absolute;

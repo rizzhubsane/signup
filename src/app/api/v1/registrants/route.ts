@@ -16,7 +16,6 @@ import {
   hashRateLimitKey,
   isHoneypotTripped,
   isWithinRateLimit,
-  verifyTurnstile,
 } from "@/lib/security";
 import { createSupabaseServiceClient } from "@/lib/supabase-server";
 
@@ -54,27 +53,6 @@ export async function POST(request: NextRequest) {
     }
 
     const clientIp = getClientIp(request);
-    const turnstile = await verifyTurnstile(
-      parsed.data.turnstileToken,
-      clientIp,
-    );
-
-    if (!turnstile.ok) {
-      if (turnstile.reason === "misconfigured") {
-        return jsonError(
-          503,
-          "bot_protection_unavailable",
-          "Registration is temporarily unavailable. Please try again later.",
-        );
-      }
-
-      return jsonError(
-        400,
-        "bot_check_failed",
-        "Please complete the verification challenge.",
-      );
-    }
-
     const supabase = createSupabaseServiceClient();
     const ipHash = hashIp(clientIp);
 

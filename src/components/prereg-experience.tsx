@@ -1,8 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import Script from "next/script";
-import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import { CONSENT_VERSION, COUNTER_BASE } from "@/lib/config";
 import type { CounterPayload } from "@/lib/schemas";
@@ -34,25 +33,6 @@ type CampusAmbassadorForm = {
   socialUrl: string;
   motivation: string;
 };
-
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (
-        container: HTMLElement,
-        options: {
-          sitekey: string;
-          theme: "dark";
-          callback: (token: string) => void;
-          "expired-callback": () => void;
-          "error-callback": () => void;
-        },
-      ) => string;
-      reset: (widgetId?: string) => void;
-      remove?: (widgetId: string) => void;
-    };
-  }
-}
 
 const initialIdentity: IdentityForm = {
   fullName: "",
@@ -92,13 +72,8 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
   const [successMessage, setSuccessMessage] = useState(
     "You're pre-registered for BECon.",
   );
-  const [turnstileToken, setTurnstileToken] = useState<string | undefined>();
   // Honeypot — must stay empty. Autofill bots that stamp every input get discarded.
   const [honeypot, setHoneypot] = useState("");
-
-  const turnstileConfigured = Boolean(
-    process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim(),
-  );
 
   const refreshCounters = useCallback(async () => {
     try {
@@ -232,7 +207,6 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
   }
 
   function goToStep(nextStep: Step) {
-    setTurnstileToken(undefined);
     setError(null);
     setStep(nextStep);
   }
@@ -241,11 +215,6 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
     type: "individual" | "startup",
     startupPayload?: StartupForm,
   ) {
-    if (turnstileConfigured && !turnstileToken) {
-      setError("Please complete the verification challenge.");
-      return;
-    }
-
     setIsSubmitting(true);
     setError(null);
 
@@ -269,7 +238,6 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
                 }
               : undefined,
           consentVersion: CONSENT_VERSION,
-          turnstileToken,
           website: honeypot,
           ...trackingParams(),
         }),
@@ -310,11 +278,6 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
       return;
     }
 
-    if (turnstileConfigured && !turnstileToken) {
-      setError("Please complete the verification challenge.");
-      return;
-    }
-
     setIsSubmitting(true);
     setError(null);
 
@@ -325,7 +288,6 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
         body: JSON.stringify({
           registrantId,
           ...campusAmbassador,
-          turnstileToken,
           website: honeypot,
         }),
       });
@@ -495,10 +457,8 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
 
             goToStep("type");
           }}
-          onTurnstileToken={setTurnstileToken}
           honeypot={honeypot}
           onHoneypotChange={setHoneypot}
-          botProtectionMissing={false}
         />
       ) : null}
     </main>
@@ -550,10 +510,8 @@ function RegistrationModal({
   onCampusAmbassadorSubmit,
   onSkipCampusAmbassador,
   onBack,
-  onTurnstileToken,
   honeypot,
   onHoneypotChange,
-  botProtectionMissing,
 }: {
   step: Step;
   registrationKind: RegistrationKind;
@@ -574,10 +532,8 @@ function RegistrationModal({
   onCampusAmbassadorSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onSkipCampusAmbassador: () => void;
   onBack: () => void;
-  onTurnstileToken: (token: string | undefined) => void;
   honeypot: string;
   onHoneypotChange: (value: string) => void;
-  botProtectionMissing: boolean;
 }) {
   return (
     <div className="modal-backdrop" role="presentation">
@@ -644,19 +600,11 @@ function RegistrationModal({
               onChange={(phone) => onIdentityChange({ ...identity, phone })}
             />
             <HoneypotField value={honeypot} onChange={onHoneypotChange} />
-            {registrationKind === "individual" ? (
-              <TurnstileField onToken={onTurnstileToken} />
-            ) : null}
-            {botProtectionMissing ? (
-              <div className="error-box">
-                Registration is temporarily unavailable. Please try again later.
-              </div>
-            ) : null}
             {error ? <div className="error-box">{error}</div> : null}
             <div className="actions">
               <button
                 className="btn-primary"
-                disabled={isSubmitting || botProtectionMissing}
+                disabled={isSubmitting}
                 type="submit"
               >
                 {registrationKind === "individual"
@@ -735,17 +683,11 @@ function RegistrationModal({
               onChange={(about) => onStartupChange({ ...startup, about })}
             />
             <HoneypotField value={honeypot} onChange={onHoneypotChange} />
-            <TurnstileField onToken={onTurnstileToken} />
-            {botProtectionMissing ? (
-              <div className="error-box">
-                Registration is temporarily unavailable. Please try again later.
-              </div>
-            ) : null}
             {error ? <div className="error-box">{error}</div> : null}
             <div className="actions">
               <button
                 className="btn-primary"
-                disabled={isSubmitting || botProtectionMissing}
+                disabled={isSubmitting}
                 type="submit"
               >
                 {isSubmitting ? "Registering..." : "Done"}
@@ -816,17 +758,11 @@ function RegistrationModal({
               }
             />
             <HoneypotField value={honeypot} onChange={onHoneypotChange} />
-            <TurnstileField onToken={onTurnstileToken} />
-            {botProtectionMissing ? (
-              <div className="error-box">
-                Applications are temporarily unavailable. Please try again later.
-              </div>
-            ) : null}
             {error ? <div className="error-box">{error}</div> : null}
             <div className="actions">
               <button
                 className="btn-primary"
-                disabled={isSubmitting || botProtectionMissing}
+                disabled={isSubmitting}
                 type="submit"
               >
                 {isSubmitting ? "Applying..." : "Apply now"}
@@ -943,65 +879,6 @@ function HoneypotField({
         onChange={(event) => onChange(event.target.value)}
       />
     </div>
-  );
-}
-
-function TurnstileField({
-  onToken,
-}: {
-  onToken: (token: string | undefined) => void;
-}) {
-  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const widgetIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!siteKey) {
-      onToken(undefined);
-      return;
-    }
-
-    const resolvedSiteKey = siteKey;
-    function renderWidget() {
-      if (!containerRef.current || !window.turnstile || widgetIdRef.current) {
-        return;
-      }
-
-      widgetIdRef.current = window.turnstile.render(containerRef.current, {
-        sitekey: resolvedSiteKey,
-        theme: "dark",
-        callback: (token) => onToken(token),
-        "expired-callback": () => onToken(undefined),
-        "error-callback": () => onToken(undefined),
-      });
-    }
-
-    const interval = window.setInterval(renderWidget, 250);
-    renderWidget();
-
-    return () => {
-      window.clearInterval(interval);
-
-      if (widgetIdRef.current && window.turnstile?.remove) {
-        window.turnstile.remove(widgetIdRef.current);
-      }
-
-      widgetIdRef.current = null;
-    };
-  }, [onToken, siteKey]);
-
-  if (!siteKey) {
-    return null;
-  }
-
-  return (
-    <>
-      <Script
-        src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
-        strategy="afterInteractive"
-      />
-      <div className="turnstile-slot" ref={containerRef} />
-    </>
   );
 }
 

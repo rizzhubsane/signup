@@ -51,7 +51,6 @@ export const registrantSchema = z
     utmCampaign: optionalText(120),
     referralCode: optionalText(80),
     consentVersion: z.string().trim().min(1).default("prereg-v1"),
-    turnstileToken: optionalText(2048),
     // Bots often autofill every field. Humans never see this.
     website: optionalText(200),
   })
@@ -72,7 +71,6 @@ export const campusAmbassadorSchema = z.object({
   yearOfStudy: optionalText(80),
   socialUrl: optionalUrl,
   motivation: optionalText(600),
-  turnstileToken: optionalText(2048),
   website: optionalText(200),
 });
 
