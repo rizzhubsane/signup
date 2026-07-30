@@ -6,7 +6,6 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from "react"
 
 import { CONSENT_VERSION, COUNTER_BASE } from "@/lib/config";
 import type { CounterPayload } from "@/lib/schemas";
-import RotatingText from "@/components/ui/rotating-text";
 import SpecularButton from "@/components/ui/specular-button";
 import { SiteBackground } from "@/components/ui/site-background";
 import { LearnMoreLinks } from "@/components/learn-more-links";
@@ -364,16 +363,23 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
         <Image
           alt="Entrepreneurship Development Cell, IIT Delhi"
           className="site-header__logo site-header__logo--edc"
-          height={200}
-          src="/edc-logo.png"
-          width={200}
+          height={240}
+          width={240}
+          src="/edc-logo.webp"
+          sizes="120px"
+          priority
+          // Already resized WebP — skip on-demand optimizer cold-start cost.
+          unoptimized
         />
         <Image
           alt="Indian Institute of Technology Delhi"
           className="site-header__logo site-header__logo--iitd"
-          height={458}
-          src="/iitd-logo.png"
-          width={436}
+          height={232}
+          width={221}
+          src="/iitd-logo.webp"
+          sizes="116px"
+          priority
+          unoptimized
         />
       </header>
 
@@ -384,11 +390,13 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
           </h1>
           <Image
             className="becon-logo"
-            src="/becon_logo.png"
+            src="/becon_logo.webp"
             alt="BECon"
-            width={1009}
-            height={686}
+            width={1120}
+            height={751}
+            sizes="(max-width: 720px) 88vw, 560px"
             priority
+            unoptimized
           />
         </div>
 
@@ -498,34 +506,26 @@ export function PreregExperience({ editionSlug }: { editionSlug: string }) {
 }
 
 function CounterGrid({ counter }: { counter: CounterPayload | null }) {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const labels = ["Attendees", "Startups"] as const;
   // Base floor always shows; real edition_counters rows stack on top.
-  const people = COUNTER_BASE.people + (counter?.people ?? 0);
-  const startups = COUNTER_BASE.startups + (counter?.startups ?? 0);
-  const texts = [formatCount(people), formatCount(startups)];
+  const values = [
+    {
+      label: "Attendees",
+      value: COUNTER_BASE.people + (counter?.people ?? 0),
+    },
+    {
+      label: "Startups",
+      value: COUNTER_BASE.startups + (counter?.startups ?? 0),
+    },
+  ];
 
   return (
     <div className="counter-grid" aria-label="BECon live counters">
-      <div className="counter-card">
-        <RotatingText
-          texts={texts}
-          mainClassName="counter-rotate"
-          staggerFrom="last"
-          initial={{ y: "100%" }}
-          animate={{ y: 0 }}
-          exit={{ y: "-120%" }}
-          staggerDuration={0.025}
-          splitLevelClassName="counter-rotate__split"
-          transition={{ type: "spring", damping: 30, stiffness: 400 }}
-          rotationInterval={2000}
-          splitBy="characters"
-          auto
-          loop
-          onNext={setActiveIndex}
-        />
-        <span className="counter-label">{labels[activeIndex]}</span>
-      </div>
+      {values.map((item) => (
+        <div className="counter-stat" key={item.label}>
+          <span className="counter-value">{formatCount(item.value)}</span>
+          <span className="counter-label">{item.label}</span>
+        </div>
+      ))}
     </div>
   );
 }

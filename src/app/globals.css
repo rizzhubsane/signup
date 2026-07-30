@@ -267,50 +267,35 @@ a {
 }
 
 .counter-grid {
-  display: flex;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
 }
 
-.counter-card {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
+.counter-stat {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
   padding: var(--space-3) var(--space-2);
-  font-size: clamp(1.89rem, 4.76vw, 2.66rem);
-  font-weight: 700;
+  text-align: center;
+}
+
+.counter-value {
+  color: var(--accent);
+  font-family: var(--font-mono-stack);
+  font-size: clamp(1.35rem, 3.4vw, 1.9rem);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
   line-height: 1.1;
 }
 
 .counter-label {
-  color: var(--text);
-  font-size: inherit;
-  font-weight: inherit;
-  letter-spacing: inherit;
-}
-
-/* Matches React Bits RotatingText usage: padded rounded badge + overflow clip. */
-.counter-rotate {
-  display: inline-flex;
-  justify-content: center;
-  overflow: hidden;
-  min-width: 5.5ch;
-  padding: 0.15em 0.45em;
-  border-radius: var(--radius-md);
-  background: var(--accent);
-  color: #0b0a0f;
-  font-family: var(--font-mono-stack);
-  font-size: inherit;
-  font-weight: inherit;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: inherit;
-}
-
-.counter-rotate__split {
-  overflow: hidden;
-  padding-bottom: 0.1em;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 /* ---------------------------------------------------------------- */
